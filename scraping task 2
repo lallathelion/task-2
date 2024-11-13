@@ -1,0 +1,108 @@
+import csv
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+
+# Configure Chrome options
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # Run in headless mode
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+
+# Initialize WebDriver
+driver = webdriver.Chrome(options=chrome_options)
+
+# CSV output configuration
+output_file = "twitter_profiles.csv"
+columns = ["Username", "Bio", "Following Count", "Followers Count", "Location", "Website"]
+
+# List of Twitter URLs to scrape
+twitter_urls = [
+    "https://twitter.com/GTNUK1",
+    "https://twitter.com/whatsapp",
+    "https://twitter.com/aacb_CBPTrade",
+    "https://twitter.com/aacbdotcom",
+    "https://twitter.com/AAWindowPRODUCT",
+    "https://twitter.com/aandb_kia",
+    "https://twitter.com/ABHomelnc",
+    "https://twitter.com/Abrepro",
+    "https://twitter.com/ACChristofiLtd",
+    "https://twitter.com/aeclothing1",
+    "https://twitter.com/AETechnologies1",
+    "https://twitter.com/wix",
+    "https://twitter.com/AGInsuranceLLC"
+]
+
+# Function to scrape details from a Twitter profile
+def scrape_twitter_profile(url):
+    driver.get(url)
+    wait = WebDriverWait(driver, 10)
+
+    try:
+        # Username
+        username = url.split("/")[-1]
+
+        # Bio
+        try:
+            bio = wait.until(EC.presence_of_element_located((By.XPATH, "//div[@data-testid='UserDescription']//span"))).text
+        except TimeoutException:
+            bio = "N/A"
+
+        # Following Count
+        following_count = get_count_by_xpath(f"//a[@href='/{username}/following']//span")
+
+        # Followers Count
+        followers_count = get_count_by_xpath(f"//a[@href='/{username}/followers']//span")
+
+        # Location
+        try:
+            location = driver.find_element(By.XPATH, "//span[@data-testid='UserLocation']").text
+        except NoSuchElementException:
+            location = "N/A"
+
+        # Website
+        try:
+            website = driver.find_element(By.XPATH, "//a[@data-testid='UserUrl']").get_attribute("href")
+        except NoSuchElementException:
+            website = "N/A"
+
+        # Returning collected data as a dictionary
+        return {
+            "Username": username,
+            "Bio": bio,
+            "Following Count": following_count,
+            "Followers Count": followers_count,
+            "Location": location,
+            "Website": website
+        }
+
+    except Exception as e:
+        print(f"Failed to scrape {url}: {e}")
+        return None
+
+# Function to handle follower/following count with retries and alternative XPaths
+def get_count_by_xpath(primary_xpath):
+    try:
+        count = driver.find_element(By.XPATH, primary_xpath).text
+    except NoSuchElementException:
+        count = "N/A"
+    return count
+
+# Write scraped data to CSV
+with open(output_file, mode='w', newline='', encoding='utf-8') as file:
+    writer = csv.DictWriter(file, fieldnames=columns)
+    writer.writeheader()
+
+    # Iterate over each Twitter URL and scrape data
+    for url in twitter_urls:
+        data = scrape_twitter_profile(url)
+        if data:
+            writer.writerow(data)
+            print(f"Data scraped from {data['Username']}")
+
+# Close the WebDriver after scraping
+driver.quit()
+
